@@ -604,16 +604,15 @@ class FiddlerMixtral:
                     idx_list = idxs[i_expert].tolist()
                     current_state = inps[None, top_2_list].reshape(-1, hidden_dim)
                     if self.is_expert_in_gpu(i_layer, i_expert):
-                        current_state = experts[i_expert](
-                            current_state, routing_weights[top_2_list, idx_list, None]
-                        )
+                        current_state = experts[i_expert](current_state)
+                        current_state *= routing_weights[top_2_list, idx_list, None]
+
                     else:
                         self.expert_placeholder.load_state_dict(
                             experts[i_expert].state_dict()
                         )
-                        current_state = self.expert_placeholder(
-                            current_state, routing_weights[top_2_list, idx_list, None]
-                        )
+                        current_state = self.expert_placeholder(current_state)
+                        current_state *= routing_weights[top_2_list, idx_list, None]
                     inps_after_experts.index_add_(
                         0,
                         top_2s[i_expert].to(self.dev, non_blocking=True),
@@ -649,6 +648,6 @@ class FiddlerMixtral:
 
     def run_expert_at_cpu(self, i_layer, i_expert, inps, routing_weights):
         """Run the expert at CPU"""
-        return self.model.layers[i_layer].block_sparse_moe.experts[i_expert](
-            inps, routing_weights
-        )
+        expert_output = self.model.layers[i_layer].block_sparse_moe.experts[i_expert](inps)
+        expert_output *= routing_weights
+        return expert_output
